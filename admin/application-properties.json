@@ -1,0 +1,24 @@
+{
+    "py_spring_model": {
+        "sqlalchemy_database_uri": "postgresql://admin:admin@localhost:5435/db",
+        "model_file_postfix_patterns": [
+            "model.py"
+        ]
+    },
+    "admin_user": {
+        "user_name": "admin",
+        "email": "admin@admin.com",
+        "password": "admin"
+    },
+    "Kafka": {
+        "bootstrap_servers": "localhost:9092"
+    },
+    "admin_security": {
+        "secret": "5ccd10e9-f60b-47d8-8d58-6fb9346ff434"
+    },
+    "auth_middleware": {
+        "excluded_routes": [
+            "/api/internal"
+        ]
+    }
+}

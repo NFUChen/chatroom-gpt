@@ -1,0 +1,19 @@
+{
+    "app_src_target_dir": "./src",
+    "server_config": {
+        "host": "0.0.0.0",
+        "port": 8085,
+        "enabled": true
+    },
+    "properties_file_path": "./application-properties.json",
+    "loguru_config": {
+        "log_format": "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{module}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
+        "log_level": "DEBUG",
+        "log_rotation": "1 day",
+        "log_retention": "7 days",
+        "log_file_path": "./logs/app.log",
+        "enable_backtrace": true,
+        "enable_diagnose": true
+    },
+    "type_checking_mode": "strict"
+}
