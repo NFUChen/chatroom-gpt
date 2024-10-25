@@ -34,6 +34,11 @@ func (controller *ChatMessageController) RegisterRoutes() {
 
 func (controller *ChatMessageController) GetChatMessagesByRoomId(c *gin.Context) {
 	roomId := c.Param("room_id")
+	if len(roomId) == 0 {
+		web.HandleBadRequest(c, errors.New("room_id is required"))
+		return
+	}
+
 	limit, err := strconv.ParseUint(c.Query("message_limit"), 10, 64)
 	if err != nil || limit == 0 {
 		web.HandleBadRequest(c, errors.New("message limit must be provided, and can't be 0"))
@@ -42,10 +47,6 @@ func (controller *ChatMessageController) GetChatMessagesByRoomId(c *gin.Context)
 	messageOffset, err := strconv.ParseUint(c.Query("message_offset"), 10, 64)
 	if err != nil {
 		web.HandleBadRequest(c, errors.New("message offset must be provided"))
-		return
-	}
-	if len(roomId) == 0 {
-		web.HandleBadRequest(c, errors.New("room_id is required"))
 		return
 	}
 
@@ -61,18 +62,20 @@ func (controller *ChatMessageController) GetChatMessagesByRoomId(c *gin.Context)
 func (controller *ChatMessageController) SendMessageToRoomId(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), controller.RequestTimeoutDuration)
 	defer cancel()
-	var message service.ChatMessage
-	if err := c.BindJSON(&message); err != nil {
+	var messageSchema service.ChatMessage
+	if err := c.BindJSON(&messageSchema); err != nil {
 		web.HandleBadRequest(c, err)
 		return
 	}
 	user := web.GetUserFromContext(c)
 
-	if len(message.Content) == 0 {
-		web.HandleBadRequest(c, errors.New("message content is required"))
+	chatMessage, err := service.NewChatMessage(messageSchema.RoomId, messageSchema.SenderId, messageSchema.Content)
+	if err != nil {
+		web.HandleBadRequest(c, err)
 		return
 	}
-	response, err := controller.ChatMessageService.SendMessageToRoomId(ctx, user.Id, message.Content)
+
+	response, err := controller.ChatMessageService.SendMessageToRoomId(ctx, user.Id, chatMessage.Content)
 	if err != nil {
 		web.HandleBadRequest(c, err)
 		return

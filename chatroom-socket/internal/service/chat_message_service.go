@@ -5,16 +5,25 @@ import (
 	"chatroom-socket/internal"
 	"context"
 	"encoding/json"
+	"errors"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"log"
 	"net/http"
+	"slices"
+	"strings"
 	"time"
 )
+
+type EventType string
 
 const (
 	BaseURL        = "http://0.0.0.0:8085/api/internal"
 	SaveMessageApi = BaseURL + "/send_chat_message"
+)
+
+const (
+	EventSendMessage EventType = "event_send_message"
 )
 
 type ChatMessage struct {
@@ -24,8 +33,7 @@ type ChatMessage struct {
 	SenderId    int        `db:"sender_id" json:"sender_id"`
 	CreatedAt   time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt   *time.Time `db:"updated_at" json:"updated_at"`
-	IsCommitted bool       `json:"is_committed" db:"-"` // Exclude from db mapping
-
+	IsCommitted bool       `json:"is_committed" db:"-"`
 }
 
 type ChatMessageService struct {
@@ -52,6 +60,65 @@ func (service *ChatMessageService) GetAllMessagesByRoomId(roomId string, offset 
 	}
 
 	return chatMessages, nil
+}
+
+func NewChatMessage(roomId string, senderId int, content string) (*ChatMessage, error) {
+	message := &ChatMessage{
+		Id:          uuid.New().String(),
+		RoomId:      roomId,
+		SenderId:    senderId,
+		Content:     content,
+		CreatedAt:   time.Now().UTC(),
+		IsCommitted: false,
+	}
+
+	if len(message.Content) == 0 {
+		return nil, errors.New("message content is required")
+	}
+	return message, nil
+}
+
+func (service *ChatMessageService) ReceiveSocketMessage(ctx context.Context, user User, event string, message any) error {
+	validEventTypes := service.GetValidEventTypes()
+	if !service.IsValidEventType(event) {
+		return errors.New("invalid event, please enter one of the following: " + strings.Join(validEventTypes, ","))
+	}
+	switch event {
+	case string(EventSendMessage):
+		messageMap, ok := message.(map[string]any)
+		if !ok {
+			return errors.New("invalid message format")
+		}
+		content, ok := messageMap["content"].(string)
+		if !ok {
+			return errors.New("invalid message format, content key not found in message")
+		}
+		err := service.handleEventSendMessage(ctx, user, content)
+		if err != nil {
+			return err
+		}
+
+	}
+
+	return nil
+}
+
+func (service *ChatMessageService) handleEventSendMessage(ctx context.Context, user User, content string) error {
+	if _, err := service.SendMessageToRoomId(ctx, user.Id, content); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (service *ChatMessageService) GetValidEventTypes() []string {
+	return []string{
+		string(EventSendMessage),
+	}
+}
+
+func (service *ChatMessageService) IsValidEventType(event string) bool {
+	return slices.Contains(service.GetValidEventTypes(), event)
 }
 
 func (service *ChatMessageService) SendMessageToRoomId(ctx context.Context, senderId int, content string) (*ChatMessage, error) {

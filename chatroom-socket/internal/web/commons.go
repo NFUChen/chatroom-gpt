@@ -10,6 +10,11 @@ const (
 	UserKey = "user"
 )
 
+type SocketMessage struct {
+	Event   string `json:"event"`
+	Message any    `json:"message"`
+}
+
 func HandleBadRequest(c *gin.Context, err error) {
 	c.JSON(http.StatusBadRequest, gin.H{
 		"error": err.Error(),

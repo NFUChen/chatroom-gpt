@@ -12,10 +12,11 @@ import (
 )
 
 type User struct {
-	Id       int
-	UserName string
-	Role     string
-	Email    string
+	Id       int    `db:"id" json:"id"`
+	UserName string `db:"user_name" json:"userName"`
+	Password string `db:"password" json:"-"`
+	Role     string `db:"role" json:"role"`
+	Email    string `db:"email" json:"email"`
 }
 
 type SocketUser struct {
@@ -101,7 +102,7 @@ func (room *Room) UserLeave(user User) (*SocketUser, error) {
 	delete(room.Users, user.Id)
 
 	room.broadcastMessage(map[string]string{
-		"message": fmt.Sprintf("User left room %v", user.UserName),
+		"message": fmt.Sprintf("User: %v left room", user.UserName),
 	})
 	return socketUser, nil
 }

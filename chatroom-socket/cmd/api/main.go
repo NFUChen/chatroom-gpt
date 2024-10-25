@@ -95,11 +95,16 @@ func main() {
 	}
 	socketService := service.NewSocketService()
 	chatMessageService := service.NewChatMessageService(sqlxEngine, roomService)
+	assistantService, err := service.NewAssistantService(sqlxEngine, chatMessageService)
+	if err != nil {
+		log.Fatalln(err)
+	}
 
 	controllers := []server.Controller{
 		controller.NewRoomController(serverEngine, roomService, socketService),
-		controller.NewSocketController(serverEngine, socketService),
+		controller.NewSocketController(serverEngine, socketService, roomService, chatMessageService, requestTimeoutSeconds),
 		controller.NewChatMessageController(serverEngine, roomService, chatMessageService, requestTimeoutSeconds),
+		controller.NewAssistantController(serverEngine, assistantService),
 	}
 
 	_server := server.NewServer(serverEngine, port, controllers)
