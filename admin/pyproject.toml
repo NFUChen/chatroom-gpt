@@ -8,7 +8,7 @@ authors = [
 dependencies = [
     "py-spring-core>=0.0.6",
     "py-spring-model @ git+https://github.com/PythonSpring/pyspring-model.git@c18753a0c0cf8632f4f0232b1bf5273f44d0ca9c",
-    "py-spring-admin @ git+https://github.com/PythonSpring/pyspring-admin.git@2e7b39d947096071436016a0e50694ccdd36302b",
+    "py-spring-admin @ git+https://github.com/PythonSpring/pyspring-admin.git@9d29e50fcc027ab09f5fc6c1c7f79a6d267d9790",
     "kafka-python @ git+https://github.com/dpkp/kafka-python.git",
 ]
 requires-python = ">=3.12"

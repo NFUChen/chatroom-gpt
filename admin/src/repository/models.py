@@ -37,7 +37,7 @@ class ChatRoom(PySpringModel, table=True):
     __tablename__: str = "chat_room"
     id: UUID = Field(primary_key=True)
     name: str = Field(unique= True)
-    owner_id: int | None = Field(default=None, foreign_key="user.id")
+    owner_id: int | None = Field(default=None, foreign_key="app_user.id")
 
     created_at: datetime = Field(default= None,
         sa_column=Column(
@@ -62,7 +62,7 @@ class ChatMessage(PySpringModel, table=True):
     id: UUID = Field(primary_key=True)
     content: str
     room_id: UUID | None = Field(default=None, foreign_key="chat_room.id")
-    sender_id: int | None = Field(default=None, foreign_key="user.id")
+    sender_id: int | None = Field(default=None, foreign_key="app_user.id")
 
     created_at: datetime = Field(
         default= None,
