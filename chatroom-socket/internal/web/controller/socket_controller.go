@@ -74,6 +74,9 @@ func (controller *SocketController) WebSocketHandler(c *gin.Context) {
 	user, ok := userInterface.(service.User)
 	if ok {
 		controller.SocketService.AddSocket(conn, user.Id)
+		if err := conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("Welcome back %s", user.UserName))); err != nil {
+			log.Println("Failed to send message to user:", err)
+		}
 		defer func() {
 			if err := controller.SocketService.RemoveSocket(user.Id); err != nil {
 				return

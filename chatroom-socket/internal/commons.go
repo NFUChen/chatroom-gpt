@@ -9,17 +9,15 @@ import (
 	"net/http"
 )
 
-//func SafeRemoveMapKey[K int | string](lock *sync.Mutex, _map *map[K]any, key K) {
-//	lock.Lock()
-//	defer lock.Unlock()
-//	delete(*_map, key)
-//}
-//
-//func SafeAddMapKey[K int | string, V any](lock *sync.Mutex, _map *map[K]any, key K, value *V) {
-//	lock.Lock()
-//	defer lock.Unlock()
-//	(*_map)[key] = value
-//}
+const BaseURL = "http://0.0.0.0:8085/api/internal"
+
+const (
+	PostSaveMessageApi = BaseURL + "/send_chat_message"
+)
+
+const (
+	PostAddNewRoom = BaseURL + "/chat_room"
+)
 
 type ServerResponse[T any] struct {
 	Message T   `json:"message"`

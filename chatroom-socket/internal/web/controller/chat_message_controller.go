@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"chatroom-socket/internal/repository"
 	"chatroom-socket/internal/service"
 	"chatroom-socket/internal/web"
 	"context"
@@ -62,14 +63,17 @@ func (controller *ChatMessageController) GetChatMessagesByRoomId(c *gin.Context)
 func (controller *ChatMessageController) SendMessageToRoomId(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), controller.RequestTimeoutDuration)
 	defer cancel()
-	var messageSchema service.ChatMessage
+	var messageSchema repository.ChatMessage
 	if err := c.BindJSON(&messageSchema); err != nil {
 		web.HandleBadRequest(c, err)
 		return
 	}
-	user := web.GetUserFromContext(c)
+	user, err := web.GetUserFromContext(c)
+	if err != nil {
+		return
+	}
 
-	chatMessage, err := service.NewChatMessage(messageSchema.RoomId, messageSchema.SenderId, messageSchema.Content)
+	chatMessage, err := repository.NewChatMessage(messageSchema.RoomId, user.Id, messageSchema.Content)
 	if err != nil {
 		web.HandleBadRequest(c, err)
 		return

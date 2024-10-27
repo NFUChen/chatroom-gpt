@@ -1,25 +1,30 @@
 package controller
 
 import (
+	"chatroom-socket/internal/repository"
 	"chatroom-socket/internal/service"
 	"chatroom-socket/internal/web"
+	"context"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"log"
 	"net/http"
+	"time"
 )
 
 type RoomController struct {
-	Engine        *gin.Engine
-	RoomService   *service.RoomService
-	SocketService *service.SocketService
+	Engine                 *gin.Engine
+	RoomService            *service.RoomService
+	SocketService          *service.SocketService
+	RequestTimeoutDuration time.Duration
 }
 
-func NewRoomController(engine *gin.Engine, roomService *service.RoomService, socketService *service.SocketService) *RoomController {
+func NewRoomController(engine *gin.Engine, roomService *service.RoomService, socketService *service.SocketService, requestTimeoutSeconds int) *RoomController {
 	return &RoomController{
-		Engine:        engine,
-		RoomService:   roomService,
-		SocketService: socketService,
+		Engine:                 engine,
+		RoomService:            roomService,
+		SocketService:          socketService,
+		RequestTimeoutDuration: time.Duration(requestTimeoutSeconds) * time.Second,
 	}
 }
 
@@ -47,7 +52,10 @@ func (controller *RoomController) UserJoinRoom(c *gin.Context) {
 	var schema struct {
 		RoomId string
 	}
-	user := web.GetUserFromContext(c)
+	user, err := web.GetUserFromContext(c)
+	if err != nil {
+		return
+	}
 	if err := c.BindJSON(&schema); err != nil {
 		web.HandleBadRequest(c, err)
 		return
@@ -59,7 +67,7 @@ func (controller *RoomController) UserJoinRoom(c *gin.Context) {
 		return
 	}
 
-	if err := controller.RoomService.UserJoinRoom(schema.RoomId, user, socket); err != nil {
+	if err := controller.RoomService.UserJoinRoom(schema.RoomId, *user, socket); err != nil {
 		web.HandleBadRequest(c, err)
 		return
 	}
@@ -69,9 +77,12 @@ func (controller *RoomController) UserJoinRoom(c *gin.Context) {
 }
 
 func (controller *RoomController) UserLeaveRoom(c *gin.Context) {
-	user := web.GetUserFromContext(c)
+	user, err := web.GetUserFromContext(c)
+	if err != nil {
+		return
+	}
 
-	socketUser, err := controller.RoomService.UserLeaveRoom(user)
+	socketUser, err := controller.RoomService.UserLeaveRoom(*user)
 
 	defer func() {
 		if socketUser != nil && socketUser.Socket != nil {
@@ -92,7 +103,11 @@ func (controller *RoomController) UserLeaveRoom(c *gin.Context) {
 }
 
 func (controller *RoomController) UserSwitchRoom(c *gin.Context) {
-	user := web.GetUserFromContext(c)
+	user, err := web.GetUserFromContext(c)
+	if err != nil {
+		return
+	}
+
 	var schema struct {
 		TargetRoomId string `json:"target_room_id"`
 	}
@@ -106,7 +121,7 @@ func (controller *RoomController) UserSwitchRoom(c *gin.Context) {
 		return
 	}
 
-	if err := controller.RoomService.UserSwitchRoom(user, schema.TargetRoomId); err != nil {
+	if err := controller.RoomService.UserSwitchRoom(*user, schema.TargetRoomId); err != nil {
 		web.HandleBadRequest(c, err)
 		return
 	}
@@ -115,4 +130,28 @@ func (controller *RoomController) UserSwitchRoom(c *gin.Context) {
 		"message": "user switch room successfully",
 	})
 
+}
+
+func (controller *RoomController) AddNewRoom(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(context.Background(), controller.RequestTimeoutDuration)
+	defer cancel()
+
+	user, err := web.GetUserFromContext(c)
+	if err != nil {
+		return
+	}
+	var addRoomSchema repository.AddRoomSchema
+	if err := c.BindJSON(&addRoomSchema); err != nil {
+		web.HandleBadRequest(c, err)
+		return
+	}
+	addRoomSchema.OwnerId = user.Id
+	room, err := controller.RoomService.CreateNewRoom(ctx, addRoomSchema)
+	if err != nil {
+		web.HandleBadRequest(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"message": room,
+	})
 }

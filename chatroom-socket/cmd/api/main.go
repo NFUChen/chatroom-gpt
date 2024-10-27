@@ -1,6 +1,7 @@
 package main
 
 import (
+	"chatroom-socket/internal/repository"
 	"chatroom-socket/internal/server"
 	"chatroom-socket/internal/service"
 	"chatroom-socket/internal/web/controller"
@@ -88,20 +89,21 @@ func main() {
 		log.Fatalln(err)
 	}
 	log.Println("Database connected...")
-
-	roomService, err := service.NewRoomService(sqlxEngine)
+	chatRoomRepository := repository.NewChatRoomRepository(sqlxEngine)
+	roomService, err := service.NewRoomService(chatRoomRepository)
 	if err != nil {
 		log.Fatalln(err)
 	}
 	socketService := service.NewSocketService()
-	chatMessageService := service.NewChatMessageService(sqlxEngine, roomService)
+	chatMessageRepository := repository.NewChatMessageRepository(sqlxEngine)
+	chatMessageService := service.NewChatMessageService(roomService, chatMessageRepository)
 	assistantService, err := service.NewAssistantService(sqlxEngine, chatMessageService)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	controllers := []server.Controller{
-		controller.NewRoomController(serverEngine, roomService, socketService),
+		controller.NewRoomController(serverEngine, roomService, socketService, requestTimeoutSeconds),
 		controller.NewSocketController(serverEngine, socketService, roomService, chatMessageService, requestTimeoutSeconds),
 		controller.NewChatMessageController(serverEngine, roomService, chatMessageService, requestTimeoutSeconds),
 		controller.NewAssistantController(serverEngine, assistantService),

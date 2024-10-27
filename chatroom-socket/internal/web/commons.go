@@ -2,6 +2,7 @@ package web
 
 import (
 	"chatroom-socket/internal/service"
+	"errors"
 	"github.com/gin-gonic/gin"
 	"net/http"
 )
@@ -22,13 +23,14 @@ func HandleBadRequest(c *gin.Context, err error) {
 	c.Abort()
 }
 
-func GetUserFromContext(c *gin.Context) service.User {
+func GetUserFromContext(c *gin.Context) (*service.User, error) {
 	userInterface, ok := c.Get(UserKey)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"detail": "user not found in context",
 		})
 		c.Abort()
+		return nil, errors.New("user not found in context")
 	}
 	user, ok := userInterface.(service.User)
 	if !ok {
@@ -36,6 +38,7 @@ func GetUserFromContext(c *gin.Context) service.User {
 			"detail": "Invalid jwt payload",
 		})
 		c.Abort()
+		return nil, errors.New("Invalid jwt payload")
 	}
-	return user
+	return &user, nil
 }

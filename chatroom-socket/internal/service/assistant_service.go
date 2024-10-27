@@ -1,6 +1,7 @@
 package service
 
 import (
+	. "chatroom-socket/internal/repository"
 	"github.com/jmoiron/sqlx"
 )
 

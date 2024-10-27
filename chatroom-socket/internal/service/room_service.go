@@ -1,14 +1,15 @@
 package service
 
 import (
+	. "chatroom-socket/internal/repository"
+	"context"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	"github.com/jmoiron/sqlx"
 	"log"
+	"net/http"
+	"slices"
 	"sync"
-	"time"
 )
 
 type User struct {
@@ -22,14 +23,6 @@ type User struct {
 type SocketUser struct {
 	User   User
 	Socket *websocket.Conn
-}
-
-type RoomRead struct {
-	Id        uuid.UUID  `db:"id" json:"id"`
-	Name      string     `db:"name" json:"name"`
-	OwnerId   int        `db:"owner_id" json:"ownerId"`
-	CreatedAt time.Time  `db:"created_at" json:"createdAt"`
-	UpdatedAt *time.Time `db:"updated_at" json:"updatedAt"`
 }
 
 type Room struct {
@@ -108,19 +101,36 @@ func (room *Room) UserLeave(user User) (*SocketUser, error) {
 }
 
 type RoomService struct {
-	Engine          *sqlx.DB
-	UserLocation    map[int]string
-	AllRooms        map[string]*Room
-	RoomServiceLock *sync.Mutex
+	UserLocation       map[int]string
+	AllRooms           map[string]*Room
+	RoomServiceLock    *sync.Mutex
+	httpClient         *http.Client
+	chatRoomRepository IChatRoomRepository
 }
 
-func NewRoomService(engin *sqlx.DB) (*RoomService, error) {
+func (service *RoomService) addRoomToCache(read RoomRead) *Room {
+
+	room := newRoom(read)
+	if cachedRoom, exists := service.AllRooms[read.Id.String()]; exists {
+		return cachedRoom
+	}
+
+	service.RoomServiceLock.Lock()
+	defer service.RoomServiceLock.Unlock()
+
+	service.AllRooms[read.Id.String()] = room
+
+	return room
+}
+
+func NewRoomService(chatRoomRepository IChatRoomRepository) (*RoomService, error) {
 
 	service := &RoomService{
-		Engine:          engin,
-		UserLocation:    make(map[int]string),
-		AllRooms:        make(map[string]*Room),
-		RoomServiceLock: new(sync.Mutex),
+		chatRoomRepository: chatRoomRepository,
+		UserLocation:       make(map[int]string),
+		AllRooms:           make(map[string]*Room),
+		RoomServiceLock:    new(sync.Mutex),
+		httpClient:         http.DefaultClient,
 	}
 	roomReads, err := service.GetAllRooms()
 	if err != nil {
@@ -128,9 +138,7 @@ func NewRoomService(engin *sqlx.DB) (*RoomService, error) {
 	}
 
 	for _, read := range roomReads {
-		room := newRoom(read)
-		// this is only init on program startup, no need to worry about thread safety
-		service.AllRooms[read.Id.String()] = room
+		service.addRoomToCache(read)
 	}
 
 	return service, nil
@@ -154,12 +162,7 @@ func (service *RoomService) GetUserLocation(userId int) (string, error) {
 }
 
 func (service *RoomService) GetAllRooms() ([]RoomRead, error) {
-	sql := `SELECT * FROM chat_room`
-	var rooms []RoomRead
-	if err := service.Engine.Select(&rooms, sql); err != nil {
-		return rooms, err
-	}
-	return rooms, nil
+	return service.chatRoomRepository.GetAllRooms()
 }
 
 func (service *RoomService) UserJoinRoom(roomId string, user User, socket *websocket.Conn) error {
@@ -240,5 +243,40 @@ func (service *RoomService) UserSwitchRoom(user User, targetRoomId string) error
 		return err
 	}
 	return nil
+}
 
+func (service *RoomService) validateAddRomSchema(schema AddRoomSchema) error {
+	validRoomTypes := []string{
+		string(RoomTypePublic),
+		string(RoomTypePrivate),
+	}
+
+	if len(schema.Name) == 0 {
+		return errors.New("name is required")
+	}
+	if len(schema.RoomType) == 0 {
+		return errors.New("room_type is required")
+	}
+
+	if !slices.Contains(validRoomTypes, string(schema.RoomType)) {
+		return errors.New("room_type is not valid")
+	}
+
+	if schema.RoomType == RoomTypePrivate && len(schema.RoomPassword) == 0 {
+		return errors.New("room_password is required for private room")
+	}
+	return nil
+}
+
+func (service *RoomService) CreateNewRoom(ctx context.Context, addRoomSchema AddRoomSchema) (*Room, error) {
+	if err := service.validateAddRomSchema(addRoomSchema); err != nil {
+		return nil, err
+	}
+
+	newRoomRead, err := service.chatRoomRepository.CreateNewRoom(ctx, &addRoomSchema)
+	if err != nil {
+		return nil, err
+	}
+	cachedRoom := service.addRoomToCache(*newRoomRead)
+	return cachedRoom, nil
 }
