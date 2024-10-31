@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"chatroom-socket/internal/service"
+	"chatroom-socket/internal/repository"
 	"chatroom-socket/internal/web"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
@@ -11,7 +11,7 @@ import (
 
 const (
 	AuthCookieName = "jwt"
-	AuthHeaderName = "Authorization"
+	AuthKeyName    = "token"
 )
 
 type AuthMiddleWare struct {
@@ -49,7 +49,10 @@ func (middleware *AuthMiddleWare) Handler() gin.HandlerFunc {
 		var tokenString string
 
 		if isWebSocketRoute {
-			authToken := c.GetHeader(AuthHeaderName)
+			authToken := c.GetHeader(AuthKeyName)
+			if len(authToken) == 0 {
+				authToken = c.Query(AuthKeyName)
+			}
 			isEmptyToken := len(authToken) == 0
 			if isEmptyToken {
 				c.JSON(http.StatusUnauthorized, gin.H{"detail": "Please pass token into Auth header"})
@@ -82,8 +85,8 @@ func (middleware *AuthMiddleWare) Handler() gin.HandlerFunc {
 		email := claims["email"].(string)
 		role := claims["role"].(string)
 
-		c.Set(web.UserKey, service.User{
-			Id:       int(userId),
+		c.Set(web.UserKey, repository.User{
+			ID:       int(userId),
 			UserName: userName,
 			Role:     role,
 			Email:    email,

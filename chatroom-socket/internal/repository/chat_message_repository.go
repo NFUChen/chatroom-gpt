@@ -13,18 +13,8 @@ import (
 	"time"
 )
 
-type ChatMessage struct {
-	Id          string     `db:"id" json:"id"`
-	Content     string     `db:"content" json:"content"`
-	RoomId      string     `db:"room_id" json:"room_id"`
-	SenderId    int        `db:"sender_id" json:"sender_id"`
-	CreatedAt   time.Time  `db:"created_at" json:"created_at"`
-	UpdatedAt   *time.Time `db:"updated_at" json:"updated_at"`
-	IsCommitted bool       `json:"is_committed" db:"-"`
-}
-
 type IChatMessageRepository interface {
-	GetAllMessagesByRoomId(roomId string, offset uint, limit uint) ([]*ChatMessage, error)
+	GetAllMessagesByRoomId(roomId uuid.UUID, offset uint, limit uint) ([]*ChatMessage, error)
 	SaveMessageToRoomId(ctx context.Context, message *ChatMessage) (*ChatMessage, error)
 }
 
@@ -40,9 +30,9 @@ func NewChatMessageRepository(engine *sqlx.DB) *ChatMessageRepository {
 	}
 }
 
-func NewChatMessage(roomId string, senderId int, content string) (*ChatMessage, error) {
+func NewChatMessage(roomId uuid.UUID, senderId int, content string) (*ChatMessage, error) {
 	message := &ChatMessage{
-		Id:          uuid.New().String(),
+		ID:          uuid.New().String(),
 		RoomId:      roomId,
 		SenderId:    senderId,
 		Content:     content,
@@ -55,7 +45,7 @@ func NewChatMessage(roomId string, senderId int, content string) (*ChatMessage, 
 	return message, nil
 }
 
-func (repository *ChatMessageRepository) GetAllMessagesByRoomId(roomId string, offset uint, limit uint) ([]*ChatMessage, error) {
+func (repository *ChatMessageRepository) GetAllMessagesByRoomId(roomId uuid.UUID, offset uint, limit uint) ([]*ChatMessage, error) {
 	sql := "SELECT * FROM chat_message WHERE room_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3"
 	log.Println(sql, roomId, limit, offset)
 	var chatMessages []*ChatMessage

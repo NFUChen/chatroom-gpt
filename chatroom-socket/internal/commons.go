@@ -16,7 +16,7 @@ const (
 )
 
 const (
-	PostAddNewRoom = BaseURL + "/chat_room"
+	ChatRoomApi = BaseURL + "/chat_room"
 )
 
 type ServerResponse[T any] struct {

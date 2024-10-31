@@ -3,15 +3,10 @@ package service
 import (
 	. "chatroom-socket/internal/repository"
 	"context"
+	"encoding/json"
+	"github.com/google/uuid"
 	"net/http"
 	"slices"
-)
-
-type EventType string
-
-const (
-	EventSendRegularMessage       EventType = "event_send_regular_message"
-	EventSendAssistantChatMessage EventType = "event_send_assistant_chat_message"
 )
 
 type ChatMessageService struct {
@@ -24,7 +19,7 @@ func NewChatMessageService(roomService *RoomService, messageRepository IChatMess
 	return &ChatMessageService{RoomService: roomService, httpClient: http.DefaultClient, chatMessageRepository: messageRepository}
 }
 
-func (service *ChatMessageService) GetAllMessagesByRoomId(roomId string, offset uint, limit uint) ([]*ChatMessage, error) {
+func (service *ChatMessageService) GetAllMessagesByRoomId(roomId uuid.UUID, offset uint, limit uint) ([]*ChatMessage, error) {
 	return service.chatMessageRepository.GetAllMessagesByRoomId(roomId, offset, limit)
 }
 
@@ -35,8 +30,8 @@ func (service *ChatMessageService) GetValidEventTypes() []string {
 	}
 }
 
-func (service *ChatMessageService) IsValidEventType(event string) bool {
-	return slices.Contains(service.GetValidEventTypes(), event)
+func (service *ChatMessageService) IsValidEventType(event EventType) bool {
+	return slices.Contains(service.GetValidEventTypes(), string(event))
 }
 
 func (service *ChatMessageService) SendMessageToRoomId(ctx context.Context, senderId int, content string) (*ChatMessage, error) {
@@ -54,7 +49,13 @@ func (service *ChatMessageService) SendMessageToRoomId(ctx context.Context, send
 	if err != nil {
 		return nil, err
 	}
-	room.broadcastMessage(message)
+
+	body, err := json.Marshal(message)
+	if err != nil {
+		return nil, err
+	}
+
+	room.broadcastMessage(NewSocketMessage(EventRoomSendMessage, string(body)))
 	message, err = service.chatMessageRepository.SaveMessageToRoomId(ctx, message)
 	if err != nil {
 		return nil, err

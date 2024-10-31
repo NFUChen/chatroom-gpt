@@ -2,7 +2,9 @@ package service
 
 import (
 	. "chatroom-socket/internal/repository"
+	"fmt"
 	"github.com/jmoiron/sqlx"
+	"log"
 )
 
 const (
@@ -37,7 +39,8 @@ func (service *AssistantService) GetAssistantUser() (*User, error) {
 	sql := "SELECT * FROM app_user WHERE user_name = $1"
 	var user User
 	if err := service.Engine.Get(&user, sql, AssistantName); err != nil {
+		log.Println(fmt.Sprintf("unable to get assistant user %v", err.Error()))
 		return nil, err
 	}
-	return &user, nil // Return the pointer to the user
+	return &user, nil
 }

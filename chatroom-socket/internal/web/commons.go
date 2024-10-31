@@ -1,7 +1,7 @@
 package web
 
 import (
-	"chatroom-socket/internal/service"
+	"chatroom-socket/internal/repository"
 	"errors"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -11,11 +11,6 @@ const (
 	UserKey = "user"
 )
 
-type SocketMessage struct {
-	Event   string `json:"event"`
-	Message any    `json:"message"`
-}
-
 func HandleBadRequest(c *gin.Context, err error) {
 	c.JSON(http.StatusBadRequest, gin.H{
 		"error": err.Error(),
@@ -23,7 +18,7 @@ func HandleBadRequest(c *gin.Context, err error) {
 	c.Abort()
 }
 
-func GetUserFromContext(c *gin.Context) (*service.User, error) {
+func GetUserFromContext(c *gin.Context) (*repository.User, error) {
 	userInterface, ok := c.Get(UserKey)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{
@@ -32,7 +27,7 @@ func GetUserFromContext(c *gin.Context) (*service.User, error) {
 		c.Abort()
 		return nil, errors.New("user not found in context")
 	}
-	user, ok := userInterface.(service.User)
+	user, ok := userInterface.(repository.User)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"detail": "Invalid jwt payload",

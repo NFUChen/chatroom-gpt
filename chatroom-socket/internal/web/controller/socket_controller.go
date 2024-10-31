@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"chatroom-socket/internal/repository"
 	"chatroom-socket/internal/service"
 	"chatroom-socket/internal/web"
 	"context"
@@ -22,7 +23,7 @@ var upgrader = websocket.Upgrader{
 }
 
 type SocketController struct {
-	Engine                 *gin.Engine
+	Router                 *gin.RouterGroup
 	SocketService          *service.SocketService
 	RoomService            *service.RoomService
 	ChatMessageService     *service.ChatMessageService
@@ -32,13 +33,13 @@ type SocketController struct {
 // RegisterRoutes registers the WebSocket routes
 func (controller *SocketController) RegisterRoutes() {
 	// Register the WebSocket handler route
-	controller.Engine.GET("/ws", controller.WebSocketHandler)
-	controller.Engine.POST("/send_notification", controller.SendNotification)
+	controller.Router.GET("/ws", controller.WebSocketHandler)
+	controller.Router.POST("/send_notification", controller.SendNotification)
 }
 
-func NewSocketController(engine *gin.Engine, socketService *service.SocketService, roomService *service.RoomService, chatMessageService *service.ChatMessageService, requestTimeoutSeconds int) *SocketController {
+func NewSocketController(router *gin.RouterGroup, socketService *service.SocketService, roomService *service.RoomService, chatMessageService *service.ChatMessageService, requestTimeoutSeconds int) *SocketController {
 	return &SocketController{
-		Engine:                 engine,
+		Router:                 router,
 		SocketService:          socketService,
 		RoomService:            roomService,
 		ChatMessageService:     chatMessageService,
@@ -47,13 +48,13 @@ func NewSocketController(engine *gin.Engine, socketService *service.SocketServic
 }
 
 func (controller *SocketController) SendNotification(c *gin.Context) {
-	var message any
+	var message service.SocketMessage
 	if err := c.BindJSON(&message); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"detail": err.Error()})
 		c.Abort()
 		return
 	}
-	controller.SocketService.SendNotification(message)
+	controller.SocketService.SendNotification(service.NewSocketMessage(service.EventNotification, message.Content))
 }
 
 func (controller *SocketController) WebSocketHandler(c *gin.Context) {
@@ -71,14 +72,14 @@ func (controller *SocketController) WebSocketHandler(c *gin.Context) {
 		c.Abort()
 		return
 	}
-	user, ok := userInterface.(service.User)
+	user, ok := userInterface.(repository.User)
 	if ok {
-		controller.SocketService.AddSocket(conn, user.Id)
-		if err := conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("Welcome back %s", user.UserName))); err != nil {
+		controller.SocketService.AddSocket(conn, user.ID)
+		if err := conn.WriteJSON(service.NewSocketMessage(service.EventGreeting, fmt.Sprintf("Welcome back %v", user.UserName))); err != nil {
 			log.Println("Failed to send message to user:", err)
 		}
 		defer func() {
-			if err := controller.SocketService.RemoveSocket(user.Id); err != nil {
+			if err := controller.SocketService.RemoveSocket(user.ID); err != nil {
 				return
 			}
 			if _, err = controller.RoomService.UserLeaveRoom(user); err != nil {
@@ -87,10 +88,10 @@ func (controller *SocketController) WebSocketHandler(c *gin.Context) {
 		}()
 	}
 	for {
-		var socketMessage web.SocketMessage
+		var socketMessage service.SocketMessage
 		err := conn.ReadJSON(&socketMessage)
 		if len(socketMessage.Event) == 0 {
-			err = fmt.Errorf("event key not foudn in socket message")
+			err = fmt.Errorf("event key not found in socket message")
 		}
 		if err != nil {
 			message := fmt.Sprintf("Error reading message: %v", err)
@@ -98,11 +99,11 @@ func (controller *SocketController) WebSocketHandler(c *gin.Context) {
 			if err := conn.WriteMessage(websocket.TextMessage, []byte(message)); err != nil {
 				log.Println(err.Error())
 			}
-			continue
+			break
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), controller.RequestTimeoutDuration)
 		defer cancel()
-		if err := controller.ChatMessageService.ReceiveSocketMessage(ctx, user, socketMessage.Event, socketMessage.Message); err != nil {
+		if err := controller.ChatMessageService.ReceiveSocketMessage(ctx, user, socketMessage.Event, socketMessage.Content); err != nil {
 			message := err.Error()
 			if err := conn.WriteMessage(websocket.TextMessage, []byte(message)); err != nil {
 				log.Println(message)

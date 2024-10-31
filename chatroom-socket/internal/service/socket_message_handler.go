@@ -1,18 +1,19 @@
 package service
 
 import (
+	. "chatroom-socket/internal/repository"
 	"context"
 	"errors"
 	"strings"
 )
 
-func (service *ChatMessageService) ReceiveSocketMessage(ctx context.Context, user User, event string, message any) error {
+func (service *ChatMessageService) ReceiveSocketMessage(ctx context.Context, user User, event EventType, message any) error {
 	validEventTypes := service.GetValidEventTypes()
 	if !service.IsValidEventType(event) {
 		return errors.New("invalid event, please enter one of the following: " + strings.Join(validEventTypes, ","))
 	}
 	switch event {
-	case string(EventSendRegularMessage):
+	case EventSendRegularMessage:
 		messageMap, ok := message.(map[string]any)
 		if !ok {
 			return errors.New("invalid message format")
@@ -31,7 +32,7 @@ func (service *ChatMessageService) ReceiveSocketMessage(ctx context.Context, use
 }
 
 func (service *ChatMessageService) handleEventSendMessage(ctx context.Context, user User, content string) error {
-	if _, err := service.SendMessageToRoomId(ctx, user.Id, content); err != nil {
+	if _, err := service.SendMessageToRoomId(ctx, user.ID, content); err != nil {
 		return err
 	}
 	return nil

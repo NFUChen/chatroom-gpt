@@ -8,6 +8,30 @@ import (
 	"sync"
 )
 
+type EventType string
+
+const (
+	EventSendRegularMessage       EventType = "event_send_regular_message"
+	EventSendAssistantChatMessage EventType = "event_send_assistant_chat_message"
+	EventRoomSendMessage          EventType = "event_room_send_message"
+	EventUserJoinRoom             EventType = "event_user_join_room"
+	EventUserLeftRoom             EventType = "event_user_left_room"
+	EventNotification             EventType = "event_notification"
+	EventGreeting                 EventType = "event_greeting"
+)
+
+type SocketMessage struct {
+	Event   EventType `json:"event"`
+	Content string    `json:"content"`
+}
+
+func NewSocketMessage(event EventType, content string) *SocketMessage {
+	return &SocketMessage{
+		Event:   event,
+		Content: content,
+	}
+}
+
 type SocketService struct {
 	UserSockets map[int]*websocket.Conn
 	ServiceLock *sync.Mutex
@@ -28,7 +52,7 @@ func (service *SocketService) AddSocket(socket *websocket.Conn, userId int) {
 
 }
 
-func (service *SocketService) SendNotification(message any) {
+func (service *SocketService) SendNotification(message *SocketMessage) {
 	for userId, socket := range service.UserSockets {
 		err := socket.WriteJSON(message)
 		if err != nil {

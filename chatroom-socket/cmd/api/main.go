@@ -26,7 +26,7 @@ var (
 	password              string
 	databaseName          string
 	host                  string
-	sqlPort               string
+	sqlPort               int
 	jwtSecret             string
 	port                  int
 	requestTimeoutSeconds int
@@ -37,7 +37,7 @@ func init() {
 	password = os.Getenv("SQL_PASSWORD")
 	databaseName = os.Getenv("SQL_DATABASE")
 	host = os.Getenv("SQL_HOST")
-	sqlPort = os.Getenv("SQL_PORT")
+	sqlPort, _ = strconv.Atoi(os.Getenv("SQL_PORT"))
 	jwtSecret = os.Getenv("JWT_SECRET")
 	requestTimeoutSeconds, _ = strconv.Atoi(os.Getenv("REQUEST_TIMEOUT_SECONDS"))
 	port, _ = strconv.Atoi(os.Getenv("PORT"))
@@ -79,16 +79,17 @@ func main() {
 
 	authMiddleWare := middleware.NewAuthMiddleWare(jwtSecret, websocketRoutes)
 	loggingMiddleware := middleware.NewLoggingMiddleware()
+	serverEngine.Use(middleware.CORSMiddleware())
 	serverEngine.Use(authMiddleWare.Handler())
 	serverEngine.Use(loggingMiddleware.Handler())
 
-	sqlConnectionUrl := fmt.Sprintf("user=%s port=%s password=%s dbname=%s host=%s sslmode=disable", user, sqlPort, password, databaseName, host)
-
+	sqlConnectionUrl := fmt.Sprintf("user=%s port=%d password=%s dbname=%s host=%s sslmode=disable", user, sqlPort, password, databaseName, host)
+	log.Println(fmt.Sprintf("Database connected with %v", sqlConnectionUrl))
 	sqlxEngine, err := sqlx.Connect("postgres", sqlConnectionUrl)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	log.Println("Database connected...")
+
 	chatRoomRepository := repository.NewChatRoomRepository(sqlxEngine)
 	roomService, err := service.NewRoomService(chatRoomRepository)
 	if err != nil {
@@ -102,10 +103,12 @@ func main() {
 		log.Fatalln(err)
 	}
 
+	httpRouter := serverEngine.Group("/api")
+	socketRouter := serverEngine.Group("/ws-api")
 	controllers := []server.Controller{
-		controller.NewRoomController(serverEngine, roomService, socketService, requestTimeoutSeconds),
-		controller.NewSocketController(serverEngine, socketService, roomService, chatMessageService, requestTimeoutSeconds),
-		controller.NewChatMessageController(serverEngine, roomService, chatMessageService, requestTimeoutSeconds),
+		controller.NewRoomController(httpRouter, roomService, socketService, requestTimeoutSeconds),
+		controller.NewSocketController(socketRouter, socketService, roomService, chatMessageService, requestTimeoutSeconds),
+		controller.NewChatMessageController(httpRouter, roomService, chatMessageService, requestTimeoutSeconds),
 		controller.NewAssistantController(serverEngine, assistantService),
 	}
 

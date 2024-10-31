@@ -7,21 +7,22 @@ import (
 	"context"
 	"errors"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"net/http"
 	"strconv"
 	"time"
 )
 
 type ChatMessageController struct {
-	Engine                 *gin.Engine
+	Router                 *gin.RouterGroup
 	RoomService            *service.RoomService
 	ChatMessageService     *service.ChatMessageService
 	RequestTimeoutDuration time.Duration
 }
 
-func NewChatMessageController(engine *gin.Engine, roomService *service.RoomService, chatMessageService *service.ChatMessageService, requestTimeoutSeconds int) *ChatMessageController {
+func NewChatMessageController(router *gin.RouterGroup, roomService *service.RoomService, chatMessageService *service.ChatMessageService, requestTimeoutSeconds int) *ChatMessageController {
 	return &ChatMessageController{
-		Engine:                 engine,
+		Router:                 router,
 		RoomService:            roomService,
 		ChatMessageService:     chatMessageService,
 		RequestTimeoutDuration: time.Duration(requestTimeoutSeconds) * time.Second,
@@ -29,13 +30,13 @@ func NewChatMessageController(engine *gin.Engine, roomService *service.RoomServi
 }
 
 func (controller *ChatMessageController) RegisterRoutes() {
-	controller.Engine.GET("/message/:room_id", controller.GetChatMessagesByRoomId)
-	controller.Engine.POST("/send_chat_message", controller.SendMessageToRoomId)
+	controller.Router.GET("/message/:room_id", controller.GetChatMessagesByRoomId)
+	controller.Router.POST("/send_chat_message", controller.SendMessageToRoomId)
 }
 
 func (controller *ChatMessageController) GetChatMessagesByRoomId(c *gin.Context) {
-	roomId := c.Param("room_id")
-	if len(roomId) == 0 {
+	roomId := uuid.MustParse(c.Param("room_id"))
+	if roomId == uuid.Nil {
 		web.HandleBadRequest(c, errors.New("room_id is required"))
 		return
 	}
@@ -73,13 +74,13 @@ func (controller *ChatMessageController) SendMessageToRoomId(c *gin.Context) {
 		return
 	}
 
-	chatMessage, err := repository.NewChatMessage(messageSchema.RoomId, user.Id, messageSchema.Content)
+	chatMessage, err := repository.NewChatMessage(messageSchema.RoomId, user.ID, messageSchema.Content)
 	if err != nil {
 		web.HandleBadRequest(c, err)
 		return
 	}
 
-	response, err := controller.ChatMessageService.SendMessageToRoomId(ctx, user.Id, chatMessage.Content)
+	response, err := controller.ChatMessageService.SendMessageToRoomId(ctx, user.ID, chatMessage.Content)
 	if err != nil {
 		web.HandleBadRequest(c, err)
 		return
